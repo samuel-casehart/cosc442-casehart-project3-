@@ -79,6 +79,41 @@ class VendingMachineBehaviorTest {
     class Stocking {
 
         @Test
+void addItem_toSlotC_storesTheSameInstance() {
+    machine.addItem(chips, "C");
+
+    assertSame(chips, machine.getItem("C"));
+}
+
+@Test
+void addItem_toSlotC_doesNotAliasAnyOtherSlot() {
+    // If "C" mapped to the wrong index, one of these adds would hit an occupied slot
+    VendingMachineItem gum = new VendingMachineItem("Gum", 0.50);
+    machine.addItem(chips, "A");
+    machine.addItem(soda, "B");
+    machine.addItem(gum, "D");
+
+    VendingMachineItem candy = new VendingMachineItem("Candy", 0.85);
+    machine.addItem(candy, "C");
+
+    assertAll(
+            () -> assertSame(chips, machine.getItem("A")),
+            () -> assertSame(soda, machine.getItem("B")),
+            () -> assertSame(candy, machine.getItem("C")),
+            () -> assertSame(gum, machine.getItem("D")));
+}
+
+@Test
+void addItem_toOccupiedSlotC_throwsAndNamesTheSlot() {
+    machine.addItem(chips, "C");
+
+    VendingMachineException ex = assertThrows(VendingMachineException.class,
+            () -> machine.addItem(soda, "C"));
+
+    assertEquals("Slot C already occupied", ex.getMessage());
+}
+
+        @Test
         void addItem_toEmptySlot_storesTheSameInstance() {
             machine.addItem(chips, "B");
 
@@ -129,6 +164,31 @@ class VendingMachineBehaviorTest {
     @Nested
     @DisplayName("removing with removeItem")
     class Removal {
+        
+        @Test
+void removeItem_fromSlotC_returnsItemAndLeavesNeighboursAlone() {
+    VendingMachineItem gum = new VendingMachineItem("Gum", 0.50);
+    machine.addItem(soda, "B");
+    machine.addItem(chips, "C");
+    machine.addItem(gum, "D");
+
+    VendingMachineItem removed = machine.removeItem("C");
+
+    assertAll(
+            () -> assertSame(chips, removed),
+            () -> assertNull(machine.getItem("C")),
+            () -> assertSame(soda, machine.getItem("B")),
+            () -> assertSame(gum, machine.getItem("D")));
+}
+
+@Test
+void removeItem_fromEmptySlotC_throwsAndNamesTheSlot() {
+    VendingMachineException ex = assertThrows(VendingMachineException.class,
+            () -> machine.removeItem("C"));
+
+    assertEquals("Slot C is empty -- cannot remove item", ex.getMessage());
+}
+
 
         @Test
         void removeItem_returnsTheItemAndEmptiesTheSlot() {
@@ -236,6 +296,19 @@ class VendingMachineBehaviorTest {
     @Nested
     @DisplayName("purchasing with makePurchase")
     class Purchasing {
+
+        @Test
+void makePurchase_fromSlotC_succeedsDeductsAndEmptiesSlot() {
+    machine.addItem(soda, "C");
+    machine.insertMoney(2.00);
+
+    boolean ok = machine.makePurchase("C");
+
+    assertAll(
+            () -> assertTrue(ok),
+            () -> assertEquals(0.50, machine.getBalance(), EPS),
+            () -> assertNull(machine.getItem("C")));
+}
 
         @Test
         void makePurchase_withEnoughMoney_succeedsDeductsAndEmptiesSlot() {
